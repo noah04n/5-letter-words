@@ -1,3 +1,4 @@
+import time
 from tqdm import tqdm
 word_length = 5
 set_length = 5
@@ -5,103 +6,107 @@ set_length = 5
 def load_words():
     words_txt = './words_alpha.txt'
     with open(words_txt) as word_file:
-        read_words = set(word_file.read().split())
+        read_words = list(word_file.read().split())
 
     print(f"{len(read_words)} words loaded")
     return read_words
 
 def extract_n_letter_words(words, n):
-    temp = set()
+    temp = list()
     for w in words:
         if len(w) == n:
-            temp.add(w)
+            temp.append(w)
+    print(f"{len(temp)} words have {n} letters")
     return temp
 
-def unique_words(words):
-    temp = set()
+def unique_words(words, n):
+    temp = list()
     anagram_dict = {}
-    # for w in words:
-    #     sorted_word = ''.join(sorted(w))
-    #     if sorted_word not in anagram_dict:
-    #         anagram_dict[sorted_word] = set()
-    #     anagram_dict[sorted_word].add(w)
 
     for w in words:
         unique_letters = set(w)
         sorted_word = ''.join(sorted(w))
-        if len(unique_letters) == word_length:
+        if len(unique_letters) == n:
             if unique_letters not in temp and sorted_word not in anagram_dict:
-                temp.add(w)
+                temp.append(w)
                 anagram_dict[sorted_word]= w
+    print(f"{len(temp)} words have a unique set of {n} letters")
     return temp
 
-def create_adjacency_matrix(words):
-    # Convert words to a list (for indexing) and precompute letter sets
-    letter_sets = [set(word) for word in words]
+
+def create_adj_list(words):
     n = len(words)
 
-    # Initialize the adjacency matrix with zeros
-    adj_matrix = [[0] * n for _ in range(n)]
+    # Initialize adjacency list
+    adj_list = {}
 
-    # Fill the adjacency matrix
-    for i in tqdm(range(n),"Matrix Construction"):
+    # Add vertices to the dictionary
+    for i in range(n):
+        adj_list[words[i]] = []
+
+    # Add edges
+    for i in tqdm(range(n),"Adjacency Construction"):
         for j in range(n):
-            if i != j and letter_sets[i].isdisjoint(letter_sets[j]):
-                adj_matrix[i][j] = 1
 
-    return adj_matrix
+            if set(words[i]).isdisjoint(words[j]):
+                adj_list[words[i]].append(words[j])
 
-def bron_kerbosch_fixed_size(R, P, X, adj_matrix, cliques, target_size):
-    # If R has reached the target size, check if it's a valid clique
-    if len(R) == target_size:
-        if not P and not X:  # No more vertices to add or exclude
-            cliques.append(R)
-        return
-
-    # Stop recursion if R exceeds the target size
-    if len(R) > target_size:
-        return
-
-    for v in list(P):
-        # Neighbors of v
-        neighbors = {u for u in range(len(adj_matrix)) if adj_matrix[v][u] == 1}
-
-        bron_kerbosch_fixed_size(
-            R | {v},                  # Add v to current clique
-            P & neighbors,            # Restrict to neighbors of v
-            X & neighbors,            # Exclude neighbors of v
-            adj_matrix,
-            cliques,
-            target_size               # Keep target size constraint
-        )
-
-        P.remove(v)
-        X.add(v)
-
-def find_cliques(adj_matrix, target_size):
-    cliques = []
-    n = len(adj_matrix)
-
-    # Call the modified Bron–Kerbosch algorithm
-    bron_kerbosch_fixed_size(set(), set(range(n)), set(), adj_matrix, cliques, target_size)
-    return cliques
+    return adj_list
 
 
+
+def find_cliques(adj_list, clique_size):
+    def backtrack(current_clique, candidates):
+
+        # If the current clique size is n, we found a complete subgraph
+        if len(current_clique) == clique_size:
+            result.append(list(current_clique))
+            print("New result: ")
+            print(current_clique)
+
+            # No longer want to consider these words in next searches
+            for word in current_clique:
+                # Cut off all its edges
+                adj_list[word] = []
+            return
+
+        # Iterate over vertices starting from 'start'
+        for word in list(candidates):
+            new_candidates = candidates & set(adj_list[word])
+            current_clique.append(word)
+            backtrack(current_clique, new_candidates)
+            current_clique.pop()
+
+
+    result = list()
+
+    for word in tqdm(adj_list,"Search Progress"):
+        backtrack([word], set(adj_list[word]))
+    return result
+
+def words_to_bitmasks(words):
+    # Convert a word to a 26-bit integer representing its letters
+
+    bitwords = []
+    for word in words:
+        bitmask = 0
+        for char in word:
+            bitmask |= 1 << (ord(char) - ord('a'))
+        bitwords.append(bitmask)
+
+    return bitwords
+
+start = time.time()
+
+# Load words as a list
 words = load_words()
 words = extract_n_letter_words(words, word_length)
-print(f"{len(words)} words have {word_length} letters")
+words = unique_words(words, word_length)
 
-words = unique_words(words)
-words = list(words)
-words = words[:2000]
-print(f"{len(words)} words have a unique set of {word_length} letters")
+adj_list = create_adj_list(words)
 
-adj_matrix = create_adjacency_matrix(words)
+result = find_cliques(adj_list, set_length)
+print("Result: " + str(result))
 
-cliques = find_cliques(adj_matrix, 3)
-print(cliques[0])
-matches = []
-for match in cliques[0]:
-    matches.append(words[match])
-print(matches)
-
+end = time.time()
+print(f"Execution time: {end-start} seconds")
