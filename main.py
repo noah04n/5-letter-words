@@ -44,7 +44,7 @@ def create_adjacency_matrix(words):
     adj_matrix = [[0] * n for _ in range(n)]
 
     # Fill the adjacency matrix
-    for i in range(n):
+    for i in tqdm(range(n),"Matrix Construction"):
         for j in range(n):
             if i != j and letter_sets[i].isdisjoint(letter_sets[j]):
                 adj_matrix[i][j] = 1
