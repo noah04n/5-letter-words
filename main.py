@@ -48,7 +48,8 @@ def create_adj_list(words):
     for i in tqdm(range(n),"Adjacency Construction"):
         for j in range(n):
 
-            if set(words[i]).isdisjoint(words[j]):
+            # Check if they have no letters in common
+            if (words[i] & words[j]) == 0:
                 adj_list[words[i]].append(words[j])
 
     return adj_list
@@ -72,7 +73,7 @@ def find_cliques(adj_list, clique_size):
 
         # Iterate over vertices starting from 'start'
         for word in list(candidates):
-            new_candidates = candidates & set(adj_list[word])
+            new_candidates = candidates & set(adj_list[word]) # O(n) n = adjacency size
             current_clique.append(word)
             backtrack(current_clique, new_candidates)
             current_clique.pop()
@@ -85,8 +86,6 @@ def find_cliques(adj_list, clique_size):
     return result
 
 def words_to_bitmasks(words):
-    # Convert a word to a 26-bit integer representing its letters
-
     bitwords = []
     for word in words:
         bitmask = 0
@@ -103,7 +102,13 @@ words = load_words()
 words = extract_n_letter_words(words, word_length)
 words = unique_words(words, word_length)
 
+# Convert words to bitmasks for efficient comparison
+words = words_to_bitmasks(words)
+
+# Build the graph as an adjacency list
 adj_list = create_adj_list(words)
+
+# adj_list = {7: [3, 5],3: [2, 1, 4, 5],5: [3, 7], 1: [2,4,3], 2: [1, 4, 3]}
 
 result = find_cliques(adj_list, set_length)
 print("Result: " + str(result))
