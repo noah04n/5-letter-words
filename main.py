@@ -1,7 +1,7 @@
 import time
 from tqdm import tqdm
 word_length = 5
-set_length = 5
+clique_size = 5
 
 def load_words():
     words_txt = './words_alpha.txt'
@@ -41,7 +41,7 @@ def create_adj_list(words):
 
     # Add vertices to the dictionary
     for i in range(n):
-        adj_list[words[i]] = []
+        adj_list[words[i]] = set()
 
     # Add edges
     for i in tqdm(range(n),"Adjacency Construction"):
@@ -49,7 +49,7 @@ def create_adj_list(words):
 
             # Check if they have no letters in common
             if (words[i] & words[j]) == 0:
-                adj_list[words[i]].append(words[j])
+                adj_list[words[i]].add(words[j])
 
     return adj_list
 
@@ -79,29 +79,27 @@ def find_cliques(adj_list, clique_size, bitlist, wordlist):
             print(bitmasks_to_words(current_clique, bitlist, wordlist))
 
             # No longer want to consider these words in next searches
+            # Set the used words's neighbours to nothing
             for word in current_clique:
                 # Cut off all its edges
-                adj_list.pop(word)
+                adj_list[word] = set()
             return 1
 
         # Iterate over vertices starting from 'start'
         for word in list(candidates):
-            if word in adj_list.keys():
-                new_candidates = candidates & set(adj_list[word]) # O(n) n = adjacency size
-                current_clique.append(word)
-                if backtrack(current_clique, new_candidates) :
-                    return 1
-                current_clique.pop()
+            # Check if the current words neighbours are also neighbours of all the other words in the clique
 
+            if all(w in adj_list[word] for w in current_clique):
+                current_clique.add(word)
+                backtrack(current_clique, adj_list[word])
+                current_clique.pop()
 
     result = list()
     adj_list_cp = adj_list.copy()
     for word in tqdm(adj_list_cp,"Search Progress"):
         if word in adj_list.keys():
-            backtrack([word], set(adj_list[word]))
+            backtrack({word}, set(adj_list[word]))
     return result
-
-
 
 start = time.time()
 
@@ -112,6 +110,7 @@ words = unique_words(words, word_length)
 
 valid_words = ["vibex", "glyph", "muntz", "dwarf","jocks","hello"]
 # words = valid_words
+valid_bitwords = words_to_bitmasks(valid_words)
 bitwords = words_to_bitmasks(words)
 
 
@@ -119,8 +118,7 @@ bitwords = words_to_bitmasks(words)
 adj_list = create_adj_list(bitwords)
 
 # adj_list = {7: [3, 5],3: [2, 1, 4, 5],5: [3, 7], 1: [2,4,3], 2: [1, 4, 3]}
-
-result = find_cliques(adj_list, set_length, bitwords, words)
+result = find_cliques(adj_list, clique_size, bitwords, words)
 print("Result: ")
 for i in range(len(result)):
     print(bitmasks_to_words(result[i], bitwords, words))
