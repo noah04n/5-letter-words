@@ -70,35 +70,48 @@ def bitmasks_to_words(bitmasks, bitlist, wordlist):
     return words
 
 def find_cliques(adj_list, clique_size, bitlist, wordlist):
+    result = []
+    all_nodes = set(adj_list.keys())
+
     def backtrack(current_clique, candidates):
+        # If the number of candidates if less than the required clique size
+        # Stop immediately
+        if len(current_clique) + len(candidates) < clique_size:
+            return None
 
         # If the current clique size is n, we found a complete subgraph
         if len(current_clique) == clique_size:
-            result.append(list(current_clique))
-            print("New result: ")
-            print(bitmasks_to_words(current_clique, bitlist, wordlist))
+            return current_clique
 
-            # No longer want to consider these words in next searches
-            # Set the used words's neighbours to nothing
-            for word in current_clique:
-                # Cut off all its edges
-                adj_list[word] = set()
-            return 1
+        # For each candidate, try to expand the clique
+        for vertex in list(candidates):
+            new_candidates = candidates.intersection(adj_list[vertex])
+            clique_found = backtrack(current_clique | {vertex}, new_candidates)
+            if clique_found is not None:
+                return clique_found
+            candidates.remove(vertex)
+        return None
 
-        # Iterate over vertices starting from 'start'
-        for word in list(candidates):
-            # Check if the current words neighbours are also neighbours of all the other words in the clique
+    # Iterate over the remaining nodes until none are left
+    while all_nodes:
+        node = all_nodes.pop()
+        clique = backtrack({node}, set(adj_list[node]))
+        if clique is not None:
+            # A valid clique was found.
+            result.append(list(clique))
+            print("New result:")
+            print(bitmasks_to_words(clique, bitlist, wordlist))
 
-            if all(w in adj_list[word] for w in current_clique):
-                current_clique.add(word)
-                backtrack(current_clique, adj_list[word])
-                current_clique.pop()
+            # Remove each word of the answer from subsequent searches
+            for v in clique:
+                if v in all_nodes:
+                    all_nodes.remove(v)
+                if v in adj_list:
+                    del adj_list[v]
+            
+            for key in list(adj_list.keys()):
+                adj_list[key] = adj_list[key] - clique
 
-    result = list()
-    adj_list_cp = adj_list.copy()
-    for word in tqdm(adj_list_cp,"Search Progress"):
-        if word in adj_list.keys():
-            backtrack({word}, set(adj_list[word]))
     return result
 
 start = time.time()
@@ -108,21 +121,17 @@ words = load_words()
 words = extract_n_letter_words(words, word_length)
 words = unique_words(words, word_length)
 
-valid_words = ["vibex", "glyph", "muntz", "dwarf","jocks","hello"]
-# words = valid_words
-valid_bitwords = words_to_bitmasks(valid_words)
 bitwords = words_to_bitmasks(words)
-
 
 # Build the graph as an adjacency list
 adj_list = create_adj_list(bitwords)
 
-# adj_list = {7: [3, 5],3: [2, 1, 4, 5],5: [3, 7], 1: [2,4,3], 2: [1, 4, 3]}
 result = find_cliques(adj_list, clique_size, bitwords, words)
 print("Result: ")
 for i in range(len(result)):
     print(bitmasks_to_words(result[i], bitwords, words))
 
 end = time.time()
+
 # Print how much time (in seconds) the code took
 print(f"Execution time: {end-start} seconds")
